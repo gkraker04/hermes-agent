@@ -1083,7 +1083,7 @@ class AIAgent:
             summary_model_override=compression_summary_model,
             quiet_mode=self.quiet_mode,
             base_url=self.base_url,
-            api_key=self._get_api_key("api_key", ""),
+            api_key=getattr(self, "api_key", ""),
             config_context_length=_config_context_length,
             provider=self.provider,
             context_cache=_config_context_cache,
