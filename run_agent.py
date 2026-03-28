@@ -1042,15 +1042,22 @@ class AIAgent:
             except (TypeError, ValueError):
                 _config_context_length = None
 
-        # Check custom_providers per-model context_length
+        # Check custom_providers per-model context_length and context_cache
         if _config_context_length is None:
             _custom_providers = _agent_cfg.get("custom_providers")
+            _config_context_cache = True  # Default: caching enabled
             if isinstance(_custom_providers, list):
                 for _cp_entry in _custom_providers:
                     if not isinstance(_cp_entry, dict):
                         continue
                     _cp_url = (_cp_entry.get("base_url") or "").rstrip("/")
                     if _cp_url and _cp_url == self.base_url.rstrip("/"):
+                        # Check provider-level context_cache setting
+                        _cp_context_cache = _cp_entry.get("context_cache")
+                        if _cp_context_cache is not None:
+                            _config_context_cache = bool(_cp_context_cache)
+                        
+                        # Check per-model settings
                         _cp_models = _cp_entry.get("models", {})
                         if isinstance(_cp_models, dict):
                             _cp_model_cfg = _cp_models.get(self.model, {})
@@ -1061,6 +1068,10 @@ class AIAgent:
                                         _config_context_length = int(_cp_ctx)
                                     except (TypeError, ValueError):
                                         pass
+                                # Per-model context_cache overrides provider-level
+                                _cp_model_context_cache = _cp_model_cfg.get("context_cache")
+                                if _cp_model_context_cache is not None:
+                                    _config_context_cache = bool(_cp_model_context_cache)
                         break
         
         self.context_compressor = ContextCompressor(
@@ -1072,9 +1083,10 @@ class AIAgent:
             summary_model_override=compression_summary_model,
             quiet_mode=self.quiet_mode,
             base_url=self.base_url,
-            api_key=getattr(self, "api_key", ""),
+            api_key=self._get_api_key("api_key", ""),
             config_context_length=_config_context_length,
             provider=self.provider,
+            context_cache=_config_context_cache,
         )
         self.compression_enabled = compression_enabled
         self._user_turn_count = 0

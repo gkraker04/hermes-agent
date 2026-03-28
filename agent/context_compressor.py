@@ -72,6 +72,7 @@ class ContextCompressor:
         api_key: str = "",
         config_context_length: int | None = None,
         provider: str = "",
+        context_cache: bool = True,
     ):
         self.model = model
         self.base_url = base_url
@@ -87,6 +88,7 @@ class ContextCompressor:
             model, base_url=base_url, api_key=api_key,
             config_context_length=config_context_length,
             provider=provider,
+            context_cache=context_cache,
         )
         self.threshold_tokens = int(self.context_length * threshold_percent)
         self.compression_count = 0

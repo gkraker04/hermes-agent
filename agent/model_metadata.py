@@ -760,12 +760,13 @@ def get_model_context_length(
     api_key: str = "",
     config_context_length: int | None = None,
     provider: str = "",
+    context_cache: bool = True,
 ) -> int:
     """Get the context length for a model.
 
     Resolution order:
     0. Explicit config override (model.context_length or custom_providers per-model)
-    1. Persistent cache (previously discovered via probing)
+    1. Persistent cache (previously discovered via probing) — skipped if context_cache=False
     2. Active endpoint metadata (/models for explicit custom endpoints)
     3. Local server query (for local endpoints)
     4. Anthropic /v1/models API (API-key users only, not OAuth)
@@ -774,6 +775,12 @@ def get_model_context_length(
     7. models.dev registry lookup (provider-aware)
     8. Thin hardcoded defaults (broad family patterns)
     9. Default fallback (128K)
+    
+    Args:
+        context_cache: If False, skip persistent cache lookup and force fresh
+                      detection from endpoints, models.dev, or live APIs. Useful
+                      for custom providers where server configuration may change.
+                      Default True for backward compatibility.
     """
     # 0. Explicit config override — user knows best
     if config_context_length is not None and isinstance(config_context_length, int) and config_context_length > 0:
@@ -784,8 +791,8 @@ def get_model_context_length(
     # local servers actually know about.  Ollama "model:tag" colons are preserved.
     model = _strip_provider_prefix(model)
 
-    # 1. Check persistent cache (model+provider)
-    if base_url:
+    # 1. Check persistent cache (model+provider) — skip if context_cache=False
+    if base_url and context_cache:
         cached = get_cached_context_length(model, base_url)
         if cached is not None:
             return cached
