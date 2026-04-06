@@ -238,7 +238,7 @@ def is_local_endpoint(base_url: str) -> bool:
     return False
 
 
-def detect_local_server_type(base_url: str) -> Optional[str]:
+def detect_local_server_type(base_url: str, api_key: Optional[str] = None) -> Optional[str]:
     """Detect which local server is running at base_url by probing known endpoints.
 
     Returns one of: "ollama", "lm-studio", "vllm", "llamacpp", or None.
@@ -250,8 +250,11 @@ def detect_local_server_type(base_url: str) -> Optional[str]:
     if server_url.endswith("/v1"):
         server_url = server_url[:-3]
 
+    # Prepare headers with API key if provided
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+
     try:
-        with httpx.Client(timeout=2.0) as client:
+        with httpx.Client(timeout=2.0, headers=headers) as client:
             # LM Studio exposes /api/v1/models — check first (most specific)
             try:
                 r = client.get(f"{server_url}/api/v1/models")
@@ -601,7 +604,7 @@ def _model_id_matches(candidate_id: str, lookup_model: str) -> bool:
     return False
 
 
-def _query_local_context_length(model: str, base_url: str) -> Optional[int]:
+def _query_local_context_length(model: str, base_url: str, api_key: Optional[str] = None) -> Optional[int]:
     """Query a local server for the model's context length."""
     import httpx
 
@@ -615,12 +618,15 @@ def _query_local_context_length(model: str, base_url: str) -> Optional[int]:
         server_url = server_url[:-3]
 
     try:
-        server_type = detect_local_server_type(base_url)
+        server_type = detect_local_server_type(base_url, api_key)
     except Exception:
         server_type = None
 
+    # Prepare headers with API key if provided
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+
     try:
-        with httpx.Client(timeout=3.0) as client:
+        with httpx.Client(timeout=3.0, headers=headers) as client:
             # Ollama: /api/show returns model details with context info
             if server_type == "ollama":
                 resp = client.post(f"{server_url}/api/show", json={"name": model})
@@ -826,7 +832,7 @@ def get_model_context_length(
         if not _is_known_provider_base_url(base_url):
             # 3. Try querying local server directly
             if is_local_endpoint(base_url):
-                local_ctx = _query_local_context_length(model, base_url)
+                local_ctx = _query_local_context_length(model, base_url, api_key)
                 if local_ctx and local_ctx > 0:
                     save_context_length(model, base_url, local_ctx)
                     return local_ctx
@@ -886,7 +892,7 @@ def get_model_context_length(
 
     # 9. Query local server as last resort
     if base_url and is_local_endpoint(base_url):
-        local_ctx = _query_local_context_length(model, base_url)
+        local_ctx = _query_local_context_length(model, base_url, api_key)
         if local_ctx and local_ctx > 0:
             save_context_length(model, base_url, local_ctx)
             return local_ctx
